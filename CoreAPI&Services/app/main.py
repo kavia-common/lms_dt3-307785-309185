@@ -18,6 +18,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routers.assessments import router as assessments_router
+from app.api.routers.auth_debug import router as auth_debug_router
 from app.api.routers.content import router as content_router
 from app.api.routers.health import router as health_router
 from app.api.routers.users import router as users_router
@@ -78,6 +79,7 @@ def create_app() -> FastAPI:
 
     # Routers
     app.include_router(health_router)
+    app.include_router(auth_debug_router)
     app.include_router(users_router)
     app.include_router(content_router)
     app.include_router(assessments_router)

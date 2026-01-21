@@ -11,7 +11,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Application configuration loaded from environment variables and optional .env file."""
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        # Prevent pydantic-settings from JSON-decoding complex env values (e.g. List[str])
+        # before our `mode="before"` validators run.
+        enable_decoding=False,
+    )
 
     app_env: str = Field(default="development", alias="APP_ENV")
 
