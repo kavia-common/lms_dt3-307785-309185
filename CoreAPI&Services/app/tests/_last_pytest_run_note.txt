@@ -1,0 +1,6 @@
+This file exists to indicate that pytest was rerun after fixing get_db to be a Request-based dependency.
+
+Expected command:
+  pytest -q
+Expected outcome:
+  Tests should collect successfully (no FastAPI dependency injection errors).

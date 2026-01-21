@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from app.core.config import Settings
@@ -20,13 +20,16 @@ def _is_enabled(settings: Settings) -> bool:
 
 
 # PUBLIC_INTERFACE
-def get_db(app: FastAPI) -> AsyncIOMotorDatabase:
-    """Get the configured MongoDB database handle from the FastAPI app state.
+def get_db(request: Request) -> AsyncIOMotorDatabase:
+    """FastAPI dependency to fetch the configured MongoDB database handle.
+
+    IMPORTANT: This must accept a `Request` (not `FastAPI`) so FastAPI can inject it
+    as a dependency via `Depends(get_db)`.
 
     This requires MongoDB to be enabled/configured and the app to have run startup.
 
     Args:
-        app: FastAPI application instance.
+        request: Current request object (used to access `request.app.state`).
 
     Returns:
         AsyncIOMotorDatabase: Motor database reference.
@@ -34,7 +37,7 @@ def get_db(app: FastAPI) -> AsyncIOMotorDatabase:
     Raises:
         RuntimeError: If MongoDB is not configured or startup was not executed.
     """
-    db: Optional[AsyncIOMotorDatabase] = getattr(app.state, _DB_ATTR, None)
+    db: Optional[AsyncIOMotorDatabase] = getattr(request.app.state, _DB_ATTR, None)
     if db is None:
         raise RuntimeError("MongoDB is not initialized on app.state")
     return db
@@ -50,7 +53,10 @@ async def mongo_ping(app: FastAPI) -> None:
     Raises:
         Exception: Any exception from Motor/PyMongo when connectivity fails.
     """
-    db = get_db(app)
+    # `mongo_ping` is not a dependency; keep it `FastAPI`-based.
+    db: Optional[AsyncIOMotorDatabase] = getattr(app.state, _DB_ATTR, None)
+    if db is None:
+        raise RuntimeError("MongoDB is not initialized on app.state")
     # Mongo ping command: { ping: 1 }
     await db.command({"ping": 1})
 
