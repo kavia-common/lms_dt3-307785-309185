@@ -1,38 +1,61 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-# Workspace from container info
-WS="/home/kavia/workspace/code-generation/lms_dt3-307785-309185/CoreAPI&Services"
-mkdir -p "$WS"
-
-# Verify python3 available
-command -v python3 >/dev/null 2>&1 || { echo "python3 not found in PATH" >&2; exit 1; }
-
-# Ensure venv support; if missing attempt non-interactive apt install
-if ! python3 -c 'import venv, sys' >/dev/null 2>&1; then
-  if command -v apt-get >/dev/null 2>&1; then
-    sudo apt-get update -q >/dev/null && sudo apt-get install -y -q python3-venv >/dev/null || { echo "failed to install python3-venv via apt-get" >&2; exit 2; }
-  else
-    echo "python venv support missing and apt-get not available; please install python3-venv" >&2
-    exit 3
-  fi
+# dependencies: create workspace venv and install python packages (safe under set -e)
+WORKSPACE="/home/kavia/workspace/code-generation/lms_dt3-307785-309185/CoreAPI&Services"
+cd "$WORKSPACE"
+PY=python3
+# verify python version >= 3.9
+read MAJOR MINOR < <($PY - <<'PY'
+import sys
+print(sys.version_info.major, sys.version_info.minor)
+PY
+)
+if [ "$MAJOR" -lt 3 ] || { [ "$MAJOR" -eq 3 ] && [ "$MINOR" -lt 9 ]; }; then
+  echo "python3 >= 3.9 required, found ${MAJOR}.${MINOR}" >&2
+  exit 2
 fi
-
-# Create venv if missing
-if [ ! -d "$WS/.venv" ]; then
-  python3 -m venv "$WS/.venv"
+VENV="$WORKSPACE/.venv"
+if [ ! -d "$VENV" ]; then
+  $PY -m venv "$VENV"
 fi
-PIP="$WS/.venv/bin/pip"
-PY="$WS/.venv/bin/python"
-if [ ! -x "$PY" ] || [ ! -x "$PIP" ]; then
-  echo "created venv but expected binaries missing at $WS/.venv" >&2
-  exit 4
+# shellcheck disable=SC1091
+source "$VENV/bin/activate"
+python -m pip install --upgrade --quiet pip setuptools
+# determine missing packages without aborting under set -e
+MFILE=$(mktemp)
+python - <<'PY' > "$MFILE" 2>/dev/null || true
+import importlib
+mapping = [
+  ("fastapi","fastapi"),
+  ("uvicorn[standard]","uvicorn"),
+  ("sqlmodel","sqlmodel"),
+  ("pytest","pytest"),
+  ("httpx","httpx"),
+]
+missing = []
+for spec, mod in mapping:
+    try:
+        importlib.import_module(mod)
+    except Exception:
+        missing.append(spec)
+print('\n'.join(missing))
+PY
+MISSING=$(tr -d '\r' < "$MFILE" || true)
+rm -f "$MFILE" || true
+if [ -n "${MISSING}" ]; then
+  # install missing packages quietly (single pip call)
+  python -m pip install --quiet ${MISSING}
 fi
-
-# Upgrade packaging tools inside venv non-interactively and quietly
-"$PIP" install --disable-pip-version-check --no-input --no-cache-dir --upgrade pip setuptools wheel >/dev/null
-
-# Verify python inside venv is runnable
-"$PY" -V >/dev/null
-
+# write frozen dev requirements (filter pkg-resources noise)
+python -m pip freeze | sed -e '/pkg-resources==0.0.0/d' > dev-requirements.txt
+# quick import validation
+python - <<'PY'
+import sys
+try:
+    import fastapi, uvicorn, sqlmodel, pytest, httpx
+except Exception as e:
+    print('dependency import failed:', e, file=sys.stderr)
+    sys.exit(2)
+print('ok')
+PY
 exit 0
