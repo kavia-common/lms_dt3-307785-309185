@@ -1,38 +1,38 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Paths from container context
+# Run async pytest smoke test for /health using venv pytest binary
 WORKSPACE="/home/kavia/workspace/code-generation/lms_dt3-307785-309185/CoreAPI&Services"
-VENV_DIR="/opt/venv"
-PY_BIN="${VENV_DIR}/bin/python"
-TEST_DIR="${WORKSPACE}/tests"
-TEST_FILE="${TEST_DIR}/test_health.py"
-LOG_DIR="${WORKSPACE}/logs"
+cd "$WORKSPACE"
 
-mkdir -p "${TEST_DIR}" "${LOG_DIR}"
+# Ensure tests directory exists
+mkdir -p tests
 
-if [ ! -x "${PY_BIN}" ]; then
-  echo "ERROR: venv python not found at ${PY_BIN}. Ensure step 'environment' and 'dependencies' have been run." >&2
+# Create async pytest smoke test for /health (idempotent overwrite)
+cat > tests/test_smoke.py <<'PY'
+import pytest
+from httpx import AsyncClient
+from app.main import app
+
+@pytest.mark.asyncio
+async def test_health():
+    async with AsyncClient(app=app, base_url='http://test') as ac:
+        r = await ac.get('/health')
+        assert r.status_code == 200
+        assert r.json().get('status') == 'ok'
+PY
+
+# Ensure venv pytest binary exists
+if [ ! -x /opt/venv/bin/pytest ]; then
+  echo "ERROR: /opt/venv/bin/pytest not found or not executable. Ensure /opt/venv exists and dependencies are installed." >&2
   exit 2
 fi
 
-# Create minimal pytest test if it doesn't exist
-if [ ! -f "${TEST_FILE}" ]; then
-  cat > "${TEST_FILE}" <<'PY'
-from fastapi.testclient import TestClient
-from app.main import app
-client = TestClient(app)
-
-def test_health():
-    r = client.get('/health')
-    assert r.status_code == 200
-    assert r.json().get('status') == 'ok'
-PY
+# Run tests with 60s external timeout to avoid hangs; fail fast on first failure; save output to /tmp/tests.log
+if command -v timeout >/dev/null 2>&1; then
+  timeout 60s /opt/venv/bin/pytest -q --maxfail=1 tests 2>&1 | tee /tmp/tests.log
+else
+  /opt/venv/bin/pytest -q --maxfail=1 tests 2>&1 | tee /tmp/tests.log
 fi
 
-cd "${WORKSPACE}"
-# Run pytest via venv-resident python and capture output for diagnostics
-# -q for concise output; -o log_cli=true to allow live logs if tests use logging
-"${PY_BIN}" -m pytest "${TEST_DIR}" -q -o log_cli=true 2>&1 | tee "${LOG_DIR}/pytest.out"
-
-exit ${PIPESTATUS[0]}
+# Exit with pytest exit code preserved by tee+pipefail (set -o pipefail is enabled via set -euo pipefail)

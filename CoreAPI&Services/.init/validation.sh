@@ -1,72 +1,86 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# validation: start venv uvicorn (single worker), poll /health, perform robust shutdown, copy logs to workspace/logs
+# Validation: start uvicorn from /opt/venv with nohup+setsid, wait for TCP + /health, determine PGID, and stop cleanly
 WORKSPACE="/home/kavia/workspace/code-generation/lms_dt3-307785-309185/CoreAPI&Services"
-VENV_DIR="/opt/venv"
-UVICORN_BIN="${VENV_DIR}/bin/uvicorn"
-LOGDIR="${WORKSPACE}/logs"
-mkdir -p "${LOGDIR}"
-LOG_FILE="/tmp/coreapi_uvicorn.log"
-APP_MODULE="${APP_MODULE:-${COREAPI_APP_MODULE:-app.main:app}}"
-HOST="${HOST:-${COREAPI_HOST:-0.0.0.0}}"
-PORT="${PORT:-${COREAPI_PORT:-8000}}"
-cd "${WORKSPACE}"
-if [ ! -x "${UVICORN_BIN}" ]; then
-  echo "error: uvicorn not found in venv: ${UVICORN_BIN}" >&2
-  exit 4
-fi
-# Start uvicorn in foreground but background the process; enforce single worker
-"${UVICORN_BIN}" "${APP_MODULE}" --host "${HOST}" --port "${PORT}" --workers 1 >"${LOG_FILE}" 2>&1 &
-SERVER_PID=$!
-# trap and cleanup on signals
-trap 'echo "validation: cleaning up"; kill -INT ${SERVER_PID} 2>/dev/null || true; sleep 1; kill -TERM ${SERVER_PID} 2>/dev/null || true; sleep 1; kill -KILL ${SERVER_PID} 2>/dev/null || true; wait ${SERVER_PID} 2>/dev/null || true; exit 1' INT TERM EXIT
-# Poll readiness using multiple addresses including container localhost and container IP
-RETRIES=20
-SLEEP=1
-URLS=("http://127.0.0.1:${PORT}/health" "http://localhost:${PORT}/health")
-CONTAINER_IP=$(hostname -I | awk '{print $1}' || echo "")
-if [ -n "${CONTAINER_IP}" ]; then
-  URLS+=("http://${CONTAINER_IP}:${PORT}/health")
-fi
-OK=0
-for i in $(seq 1 ${RETRIES}); do
-  for u in "${URLS[@]}"; do
-    if curl -sS --max-time 2 "$u" 2>/dev/null | grep -q '"status": *"ok"'; then
-      OK=1; break 2
-    fi
-  done
-  if ! kill -0 ${SERVER_PID} 2>/dev/null; then
-    echo "server process died early; see log ${LOG_FILE}" >&2
-    sed -n '1,200p' "${LOG_FILE}" >&2 || true
-    trap - INT TERM EXIT
-    exit 5
-  fi
-  sleep ${SLEEP}
-done
-if [ ${OK} -ne 1 ]; then
-  echo "validation failed: server did not respond" >&2
-  sed -n '1,200p' "${LOG_FILE}" >&2 || true
-  # cleanup
-  kill -INT ${SERVER_PID} 2>/dev/null || true
-  sleep 1
-  kill -TERM ${SERVER_PID} 2>/dev/null || true
-  sleep 1
-  kill -KILL ${SERVER_PID} 2>/dev/null || true
-  trap - INT TERM EXIT
+cd "$WORKSPACE"
+# Source global profile if present
+source /etc/profile.d/coreapi_services.sh || true
+LOG=/tmp/coreapi_uvicorn.log
+PORT_NOW="${PORT:-8000}"
+HOST_NOW="${HOST:-0.0.0.0}"
+# Ensure uvicorn binary in venv
+if [ ! -x "/opt/venv/bin/uvicorn" ]; then
+  echo "ERROR: /opt/venv/bin/uvicorn missing" >&2
   exit 2
 fi
-# Graceful shutdown
-kill -INT ${SERVER_PID} 2>/dev/null || true
-sleep 2
-if kill -0 ${SERVER_PID} 2>/dev/null; then
-  kill -TERM ${SERVER_PID} 2>/dev/null || true
-  sleep 2
+# Start uvicorn with nohup+setsid into background, capture starter PID
+nohup setsid /opt/venv/bin/uvicorn app.main:app --host "$HOST_NOW" --port "$PORT_NOW" >"$LOG" 2>&1 &
+START_PID=$!
+# small settle
+sleep 0.5
+# Resolve PGID: prefer actual uvicorn process pgid if found, else use starter pid pgid
+PGID=""
+V_PID=$(pgrep -f -n "/opt/venv/bin/uvicorn app.main:app" || true)
+if [ -n "$V_PID" ]; then
+  PGID=$(ps -o pgid= -p "$V_PID" | tr -d ' ' || true)
 fi
-if kill -0 ${SERVER_PID} 2>/dev/null; then
-  kill -KILL ${SERVER_PID} 2>/dev/null || true
+if [ -z "$PGID" ]; then
+  PGID=$(ps -o pgid= -p "$START_PID" | tr -d ' ' || true)
 fi
-wait ${SERVER_PID} 2>/dev/null || true
-trap - INT TERM EXIT
-cp "${LOG_FILE}" "${LOGDIR}/coreapi_uvicorn.log" || true
-echo "validation OK, log: ${LOGDIR}/coreapi_uvicorn.log"
-exit 0
+_cleanup(){
+  # Prefer terminating the whole process group if available
+  if [ -n "$PGID" ]; then
+    kill -TERM -"$PGID" 2>/dev/null || true
+  else
+    kill "$START_PID" 2>/dev/null || true
+  fi
+  # give time to exit
+  sleep 0.2
+}
+trap _cleanup EXIT
+# Wait for TCP port to accept connections (max 15s)
+READY=0
+for i in $(seq 1 15); do
+  if /opt/venv/bin/python - <<PY 2>/dev/null
+import socket,sys
+s=socket.socket()
+s.settimeout(0.5)
+try:
+    s.connect(('127.0.0.1', int(${PORT_NOW})))
+    s.close(); print('ok')
+except Exception:
+    sys.exit(1)
+PY
+  then
+    READY=1; break
+  fi
+  sleep 1
+done
+if [ "$READY" -ne 1 ]; then
+  echo "status:FAIL:port-not-ready"
+  echo "--- uvicorn log tail ---"
+  tail -n 200 "$LOG" || true
+  exit 3
+fi
+# Probe /health endpoint using venv python + httpx
+/opt/venv/bin/python - <<PY 2>/dev/null
+import sys
+from httpx import Client
+try:
+    r=Client().get(f'http://127.0.0.1:{int(${PORT_NOW})}/health', timeout=5.0)
+    if r.status_code==200:
+        print('status:OK')
+        sys.exit(0)
+    else:
+        print('status:FAIL', r.status_code)
+        sys.exit(4)
+except Exception as e:
+    print('status:ERR', e)
+    sys.exit(5)
+PY
+RES=$?
+# cleanup now (trap also ensures cleanup on unexpected exit)
+_cleanup
+# Emit concise log path for debugging and exit with probe result
+echo "log:$LOG"
+exit $RES
