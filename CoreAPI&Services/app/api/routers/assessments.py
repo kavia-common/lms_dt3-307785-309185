@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, Request, status
 
+from app.core.db import get_db
 from app.schemas.assessments import (
     AssessmentCreate,
     AssessmentListResponse,
@@ -13,9 +14,10 @@ from app.services.assessments import AssessmentsService
 router = APIRouter(prefix="/assessments", tags=["Assessments"])
 
 
-def get_assessments_service() -> AssessmentsService:
-    """Dependency provider for AssessmentsService (placeholder DI)."""
-    return AssessmentsService()
+def get_assessments_service(request: Request) -> AssessmentsService:
+    """Dependency provider for AssessmentsService (MongoDB-backed)."""
+    db = get_db(request.app)
+    return AssessmentsService(db=db)
 
 
 @router.get(
@@ -26,6 +28,8 @@ def get_assessments_service() -> AssessmentsService:
     operation_id="listAssessments",
 )
 async def list_assessments(
+    skip: int = Query(0, ge=0, description="Pagination offset."),
+    limit: int = Query(50, ge=1, le=200, description="Pagination page size."),
     service: AssessmentsService = Depends(get_assessments_service),
 ) -> AssessmentListResponse:
     # PUBLIC_INTERFACE
@@ -37,7 +41,7 @@ async def list_assessments(
     Returns:
         AssessmentListResponse: Placeholder list payload.
     """
-    return await service.list_assessments()
+    return await service.list_assessments(skip=skip, limit=limit)
 
 
 @router.get(

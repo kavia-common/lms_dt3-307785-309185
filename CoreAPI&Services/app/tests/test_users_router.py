@@ -1,24 +1,86 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from fastapi.testclient import TestClient
 
 from app.main import create_app
 
 
-def test_users_list_returns_placeholder_structure(monkeypatch) -> None:
+def test_users_list_ok_with_pagination(monkeypatch) -> None:
     app = create_app()
-    client = TestClient(app)
 
-    resp = client.get("/users")
+    now = datetime.now(tz=timezone.utc)
+
+    class _FakeUsersService:
+        async def list_users(self, *, skip: int = 0, limit: int = 50):
+            return {
+                "items": [
+                    {
+                        "id": "507f1f77bcf86cd799439011",
+                        "name": "Alice",
+                        "email": "alice@example.com",
+                        "created_at": now.isoformat(),
+                        "updated_at": now.isoformat(),
+                        "deleted_at": None,
+                    }
+                ],
+                "total": 1,
+                "skip": skip,
+                "limit": limit,
+            }
+
+    monkeypatch.setattr("app.api.routers.users.get_users_service", lambda _request: _FakeUsersService())
+
+    client = TestClient(app)
+    resp = client.get("/users?skip=5&limit=10")
     assert resp.status_code == 200
 
     payload = resp.json()
-    assert "items" in payload
-    assert "total" in payload
-    assert isinstance(payload["items"], list)
-    assert isinstance(payload["total"], int)
+    assert payload["total"] == 1
+    assert payload["skip"] == 5
+    assert payload["limit"] == 10
+    assert len(payload["items"]) == 1
+    assert payload["items"][0]["email"] == "alice@example.com"
 
-    assert payload["total"] >= 1
-    assert len(payload["items"]) >= 1
-    first = payload["items"][0]
-    assert set(first.keys()) >= {"id", "name", "created_at", "updated_at"}
+
+def test_users_create_returns_201(monkeypatch) -> None:
+    app = create_app()
+    now = datetime.now(tz=timezone.utc)
+
+    class _FakeUsersService:
+        async def create_user(self, payload):
+            return {
+                "id": "507f1f77bcf86cd799439011",
+                "name": payload.name,
+                "email": payload.email,
+                "created_at": now.isoformat(),
+                "updated_at": now.isoformat(),
+                "deleted_at": None,
+            }
+
+    monkeypatch.setattr("app.api.routers.users.get_users_service", lambda _request: _FakeUsersService())
+
+    client = TestClient(app)
+    resp = client.post("/users", json={"name": "Bob", "email": "bob@example.com"})
+    assert resp.status_code == 201
+    payload = resp.json()
+    assert payload["name"] == "Bob"
+    assert payload["email"] == "bob@example.com"
+    assert "id" in payload
+
+
+def test_users_get_not_found(monkeypatch) -> None:
+    from fastapi import HTTPException, status
+
+    app = create_app()
+
+    class _FakeUsersService:
+        async def get_user(self, _user_id: str):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+    monkeypatch.setattr("app.api.routers.users.get_users_service", lambda _request: _FakeUsersService())
+
+    client = TestClient(app)
+    resp = client.get("/users/507f1f77bcf86cd799439011")
+    assert resp.status_code == 404

@@ -85,8 +85,14 @@ Run:
 docker run --rm -p 3001:3001 --env-file .env lms-coreapi
 ```
 
-## Domain API skeletons (new)
-These endpoints are **placeholders** to establish the LMS domain structure (no DB logic yet):
+## Domain APIs (MongoDB-backed)
+These endpoints now implement **basic MongoDB-backed CRUD** (using Motor via `app/core/db.py`) including:
+- Create, Get-by-id, List (pagination), Update, Soft delete
+- ObjectId serialization (`_id` -> `id`)
+- Minimal indexes:
+  - Users: unique `email`
+  - Content: `slug` and `title`
+  - Assessments: `course_id` + `module_id`
 
 ### Users
 - `GET /users` (list)

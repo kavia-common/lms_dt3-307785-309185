@@ -1,16 +1,18 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, Request, status
 
+from app.core.db import get_db
 from app.schemas.users import UserCreate, UserListResponse, UserRead, UserUpdate
 from app.services.users import UsersService
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
 
-def get_users_service() -> UsersService:
-    """Dependency provider for UsersService (placeholder DI)."""
-    return UsersService()
+def get_users_service(request: Request) -> UsersService:
+    """Dependency provider for UsersService (MongoDB-backed)."""
+    db = get_db(request.app)
+    return UsersService(db=db)
 
 
 @router.get(
@@ -20,7 +22,11 @@ def get_users_service() -> UsersService:
     response_model=UserListResponse,
     operation_id="listUsers",
 )
-async def list_users(service: UsersService = Depends(get_users_service)) -> UserListResponse:
+async def list_users(
+    skip: int = Query(0, ge=0, description="Pagination offset."),
+    limit: int = Query(50, ge=1, le=200, description="Pagination page size."),
+    service: UsersService = Depends(get_users_service),
+) -> UserListResponse:
     # PUBLIC_INTERFACE
     """List users.
 
@@ -30,7 +36,7 @@ async def list_users(service: UsersService = Depends(get_users_service)) -> User
     Returns:
         UserListResponse: Placeholder list payload.
     """
-    return await service.list_users()
+    return await service.list_users(skip=skip, limit=limit)
 
 
 @router.get(

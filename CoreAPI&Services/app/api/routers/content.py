@@ -1,16 +1,18 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, Request, status
 
+from app.core.db import get_db
 from app.schemas.content import ContentCreate, ContentListResponse, ContentRead, ContentUpdate
 from app.services.content import ContentService
 
 router = APIRouter(prefix="/content", tags=["Content"])
 
 
-def get_content_service() -> ContentService:
-    """Dependency provider for ContentService (placeholder DI)."""
-    return ContentService()
+def get_content_service(request: Request) -> ContentService:
+    """Dependency provider for ContentService (MongoDB-backed)."""
+    db = get_db(request.app)
+    return ContentService(db=db)
 
 
 @router.get(
@@ -20,7 +22,11 @@ def get_content_service() -> ContentService:
     response_model=ContentListResponse,
     operation_id="listContent",
 )
-async def list_content(service: ContentService = Depends(get_content_service)) -> ContentListResponse:
+async def list_content(
+    skip: int = Query(0, ge=0, description="Pagination offset."),
+    limit: int = Query(50, ge=1, le=200, description="Pagination page size."),
+    service: ContentService = Depends(get_content_service),
+) -> ContentListResponse:
     # PUBLIC_INTERFACE
     """List content items.
 
@@ -30,7 +36,7 @@ async def list_content(service: ContentService = Depends(get_content_service)) -
     Returns:
         ContentListResponse: Placeholder list payload.
     """
-    return await service.list_content()
+    return await service.list_content(skip=skip, limit=limit)
 
 
 @router.get(

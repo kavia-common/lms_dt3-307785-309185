@@ -33,15 +33,15 @@ openapi_tags = [
     },
     {
         "name": "Users",
-        "description": "Users domain endpoints (placeholder CRUD).",
+        "description": "Users domain endpoints (MongoDB-backed CRUD).",
     },
     {
         "name": "Content",
-        "description": "Content domain endpoints (placeholder CRUD).",
+        "description": "Content domain endpoints (MongoDB-backed CRUD).",
     },
     {
         "name": "Assessments",
-        "description": "Assessments domain endpoints (placeholder CRUD).",
+        "description": "Assessments domain endpoints (MongoDB-backed CRUD).",
     },
 ]
 
