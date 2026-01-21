@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any, Mapping
 
 from bson import ObjectId
-from pymongo.errors import InvalidId
+from bson.errors import InvalidId
 
 
 # PUBLIC_INTERFACE
