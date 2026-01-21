@@ -4,11 +4,13 @@ import os
 
 from fastapi.testclient import TestClient
 
+from app.core.config import clear_settings_cache
 from app.main import create_app
 
 
 def test_auth_debug_returns_principal_when_stub_enabled(monkeypatch) -> None:
     monkeypatch.setenv("AUTH_STUB", "true")
+    clear_settings_cache()
     app = create_app()
     client = TestClient(app)
 
@@ -30,6 +32,7 @@ def test_auth_debug_returns_principal_when_stub_enabled(monkeypatch) -> None:
 def test_auth_debug_returns_501_when_stub_disabled(monkeypatch) -> None:
     # Ensure we explicitly disable for this test even if local env has it enabled.
     monkeypatch.setenv("AUTH_STUB", "false")
+    clear_settings_cache()
     app = create_app()
     client = TestClient(app)
 

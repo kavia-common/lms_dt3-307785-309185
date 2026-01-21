@@ -4,10 +4,11 @@ from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 
+from app.api.routers.assessments import get_assessments_service
 from app.main import create_app
 
 
-def test_assessments_list_ok_with_pagination(monkeypatch) -> None:
+def test_assessments_list_ok_with_pagination() -> None:
     app = create_app()
     now = datetime.now(tz=timezone.utc)
 
@@ -30,10 +31,7 @@ def test_assessments_list_ok_with_pagination(monkeypatch) -> None:
                 "limit": limit,
             }
 
-    monkeypatch.setattr(
-        "app.api.routers.assessments.get_assessments_service",
-        lambda _request: _FakeAssessmentsService(),
-    )
+    app.dependency_overrides[get_assessments_service] = lambda: _FakeAssessmentsService()
 
     client = TestClient(app)
     resp = client.get("/assessments?skip=2&limit=3")
@@ -44,7 +42,7 @@ def test_assessments_list_ok_with_pagination(monkeypatch) -> None:
     assert payload["items"][0]["title"] == "Quiz 1"
 
 
-def test_assessments_create_returns_201(monkeypatch) -> None:
+def test_assessments_create_returns_201() -> None:
     app = create_app()
     now = datetime.now(tz=timezone.utc)
 
@@ -60,10 +58,7 @@ def test_assessments_create_returns_201(monkeypatch) -> None:
                 "deleted_at": None,
             }
 
-    monkeypatch.setattr(
-        "app.api.routers.assessments.get_assessments_service",
-        lambda _request: _FakeAssessmentsService(),
-    )
+    app.dependency_overrides[get_assessments_service] = lambda: _FakeAssessmentsService()
 
     client = TestClient(app)
     resp = client.post(
@@ -76,7 +71,7 @@ def test_assessments_create_returns_201(monkeypatch) -> None:
     assert payload["course_id"] == "507f1f77bcf86cd799439099"
 
 
-def test_assessments_get_not_found(monkeypatch) -> None:
+def test_assessments_get_not_found() -> None:
     from fastapi import HTTPException, status
 
     app = create_app()
@@ -85,10 +80,7 @@ def test_assessments_get_not_found(monkeypatch) -> None:
         async def get_assessment(self, _assessment_id: str):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found.")
 
-    monkeypatch.setattr(
-        "app.api.routers.assessments.get_assessments_service",
-        lambda _request: _FakeAssessmentsService(),
-    )
+    app.dependency_overrides[get_assessments_service] = lambda: _FakeAssessmentsService()
 
     client = TestClient(app)
     resp = client.get("/assessments/507f1f77bcf86cd799439013")

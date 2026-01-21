@@ -118,5 +118,20 @@ class Settings(BaseSettings):
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    """Return cached Settings instance."""
+    """Return cached Settings instance.
+
+    Notes:
+        This function is cached for performance in production, but tests may need to change
+        environment variables between app instances. For that, use `clear_settings_cache()`.
+    """
     return Settings()
+
+
+# PUBLIC_INTERFACE
+def clear_settings_cache() -> None:
+    """Clear the cached Settings instance.
+
+    This is primarily intended for tests where environment variables are monkeypatched
+    between test cases and we need `get_settings()` to reflect the new values.
+    """
+    get_settings.cache_clear()

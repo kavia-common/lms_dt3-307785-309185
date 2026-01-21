@@ -4,10 +4,11 @@ from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 
+from app.api.routers.content import get_content_service
 from app.main import create_app
 
 
-def test_content_list_ok_with_pagination(monkeypatch) -> None:
+def test_content_list_ok_with_pagination() -> None:
     app = create_app()
     now = datetime.now(tz=timezone.utc)
 
@@ -29,9 +30,7 @@ def test_content_list_ok_with_pagination(monkeypatch) -> None:
                 "limit": limit,
             }
 
-    monkeypatch.setattr(
-        "app.api.routers.content.get_content_service", lambda _request: _FakeContentService()
-    )
+    app.dependency_overrides[get_content_service] = lambda: _FakeContentService()
 
     client = TestClient(app)
     resp = client.get("/content?skip=0&limit=1")
@@ -41,7 +40,7 @@ def test_content_list_ok_with_pagination(monkeypatch) -> None:
     assert payload["items"][0]["slug"] == "intro"
 
 
-def test_content_create_returns_201(monkeypatch) -> None:
+def test_content_create_returns_201() -> None:
     app = create_app()
     now = datetime.now(tz=timezone.utc)
 
@@ -56,9 +55,7 @@ def test_content_create_returns_201(monkeypatch) -> None:
                 "deleted_at": None,
             }
 
-    monkeypatch.setattr(
-        "app.api.routers.content.get_content_service", lambda _request: _FakeContentService()
-    )
+    app.dependency_overrides[get_content_service] = lambda: _FakeContentService()
 
     client = TestClient(app)
     resp = client.post("/content", json={"title": "Intro", "slug": "intro"})
@@ -67,7 +64,7 @@ def test_content_create_returns_201(monkeypatch) -> None:
     assert payload["slug"] == "intro"
 
 
-def test_content_get_not_found(monkeypatch) -> None:
+def test_content_get_not_found() -> None:
     from fastapi import HTTPException, status
 
     app = create_app()
@@ -76,9 +73,7 @@ def test_content_get_not_found(monkeypatch) -> None:
         async def get_content(self, _content_id: str):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found.")
 
-    monkeypatch.setattr(
-        "app.api.routers.content.get_content_service", lambda _request: _FakeContentService()
-    )
+    app.dependency_overrides[get_content_service] = lambda: _FakeContentService()
 
     client = TestClient(app)
     resp = client.get("/content/507f1f77bcf86cd799439012")
