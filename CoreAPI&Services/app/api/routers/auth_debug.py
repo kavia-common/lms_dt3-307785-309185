@@ -10,17 +10,18 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 
 @router.get(
     "/debug",
-    summary="Auth stub debug endpoint",
+    summary="Auth debug endpoint (stub or real JWT)",
     description=(
-        "When AUTH_STUB=true, returns the resolved stub Principal. "
-        "When AUTH_STUB=false, returns 501 until real OIDC validation is implemented."
+        "When AUTH_STUB=true, returns the resolved stub Principal (can be overridden by headers). "
+        "When AUTH_STUB=false, requires Authorization: Bearer <access_token> and returns the "
+        "Principal derived from validated JWT claims."
     ),
     response_model=Principal,
     operation_id="getAuthDebugPrincipal",
 )
 async def auth_debug(principal: Principal = Depends(get_current_principal)) -> Principal:
     # PUBLIC_INTERFACE
-    """Echo the current principal (stub only).
+    """Echo the current principal.
 
     Args:
         principal: Resolved current principal.

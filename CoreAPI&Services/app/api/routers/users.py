@@ -3,7 +3,10 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
+from app.api.deps import require_roles
+from app.api.security_policies import ADMIN_ROLES, READ_ROLES, WRITE_ROLES
 from app.core.db import get_db
+from app.schemas.security import Principal
 from app.schemas.users import UserCreate, UserListResponse, UserRead, UserUpdate
 from app.services.users import UsersService
 
@@ -23,7 +26,7 @@ def get_users_service(db: AsyncIOMotorDatabase = Depends(get_db)) -> UsersServic
 @router.get(
     "",
     summary="List users",
-    description="List users (placeholder). No auth enforced yet.",
+    description="List users. Requires authenticated user with a read role.",
     response_model=UserListResponse,
     operation_id="listUsers",
 )
@@ -31,6 +34,7 @@ async def list_users(
     skip: int = Query(0, ge=0, description="Pagination offset."),
     limit: int = Query(50, ge=1, le=200, description="Pagination page size."),
     service: UsersService = Depends(get_users_service),
+    _principal: Principal = Depends(require_roles(*READ_ROLES)),
 ) -> UserListResponse:
     # PUBLIC_INTERFACE
     """List users.
@@ -39,7 +43,7 @@ async def list_users(
         service: UsersService dependency.
 
     Returns:
-        UserListResponse: Placeholder list payload.
+        UserListResponse: Paginated users list.
     """
     return await service.list_users(skip=skip, limit=limit)
 
@@ -47,11 +51,15 @@ async def list_users(
 @router.get(
     "/{user_id}",
     summary="Get user by id",
-    description="Fetch a single user (placeholder). No auth enforced yet.",
+    description="Fetch a single user by id. Requires authenticated user with a read role.",
     response_model=UserRead,
     operation_id="getUserById",
 )
-async def get_user(user_id: str, service: UsersService = Depends(get_users_service)) -> UserRead:
+async def get_user(
+    user_id: str,
+    service: UsersService = Depends(get_users_service),
+    _principal: Principal = Depends(require_roles(*READ_ROLES)),
+) -> UserRead:
     # PUBLIC_INTERFACE
     """Get a user by id.
 
@@ -60,7 +68,7 @@ async def get_user(user_id: str, service: UsersService = Depends(get_users_servi
         service: UsersService dependency.
 
     Returns:
-        UserRead: Placeholder user record.
+        UserRead: User record.
     """
     return await service.get_user(user_id)
 
@@ -68,7 +76,7 @@ async def get_user(user_id: str, service: UsersService = Depends(get_users_servi
 @router.post(
     "",
     summary="Create user",
-    description="Create a user (placeholder). No auth enforced yet.",
+    description="Create a user. Requires authenticated user with a write role.",
     response_model=UserRead,
     status_code=status.HTTP_201_CREATED,
     operation_id="createUser",
@@ -76,6 +84,7 @@ async def get_user(user_id: str, service: UsersService = Depends(get_users_servi
 async def create_user(
     payload: UserCreate,
     service: UsersService = Depends(get_users_service),
+    _principal: Principal = Depends(require_roles(*WRITE_ROLES)),
 ) -> UserRead:
     # PUBLIC_INTERFACE
     """Create a user.
@@ -85,7 +94,7 @@ async def create_user(
         service: UsersService dependency.
 
     Returns:
-        UserRead: Created placeholder user record.
+        UserRead: Created user record.
     """
     return await service.create_user(payload)
 
@@ -93,7 +102,7 @@ async def create_user(
 @router.put(
     "/{user_id}",
     summary="Update user",
-    description="Update a user (placeholder). No auth enforced yet.",
+    description="Update a user. Requires authenticated user with a write role.",
     response_model=UserRead,
     operation_id="updateUser",
 )
@@ -101,6 +110,7 @@ async def update_user(
     user_id: str,
     payload: UserUpdate,
     service: UsersService = Depends(get_users_service),
+    _principal: Principal = Depends(require_roles(*WRITE_ROLES)),
 ) -> UserRead:
     # PUBLIC_INTERFACE
     """Update a user.
@@ -111,7 +121,7 @@ async def update_user(
         service: UsersService dependency.
 
     Returns:
-        UserRead: Updated placeholder user record.
+        UserRead: Updated user record.
     """
     return await service.update_user(user_id, payload)
 
@@ -119,10 +129,14 @@ async def update_user(
 @router.delete(
     "/{user_id}",
     summary="Delete user",
-    description="Delete a user (placeholder). No auth enforced yet.",
+    description="Soft-delete a user. Requires authenticated admin role.",
     operation_id="deleteUser",
 )
-async def delete_user(user_id: str, service: UsersService = Depends(get_users_service)) -> dict:
+async def delete_user(
+    user_id: str,
+    service: UsersService = Depends(get_users_service),
+    _principal: Principal = Depends(require_roles(*ADMIN_ROLES)),
+) -> dict:
     # PUBLIC_INTERFACE
     """Delete a user.
 

@@ -47,14 +47,18 @@ class Settings(BaseSettings):
     mongodb_dbname: str = Field(default="lms", alias="MONGODB_DBNAME")
     mongodb_tls: bool = Field(default=False, alias="MONGODB_TLS")
 
-    # Auth / OIDC scaffolding
-    # NOTE: Default True to keep dev/tests working until real OIDC validation is implemented.
+    # Auth / OIDC
+    # NOTE: Default True to keep dev/tests working until real OIDC validation is enabled.
     auth_stub: bool = Field(default=True, alias="AUTH_STUB")
 
+    # OIDC/JWT verification settings
     oidc_issuer: Optional[str] = Field(default=None, alias="OIDC_ISSUER")
     oidc_client_id: Optional[str] = Field(default=None, alias="OIDC_CLIENT_ID")
+    # Audience is optional; if unset, aud validation is disabled.
     oidc_audience: Optional[str] = Field(default=None, alias="OIDC_AUDIENCE")
     oidc_jwks_uri: Optional[str] = Field(default=None, alias="OIDC_JWKS_URI")
+    # Allowed JWT signing algorithms. Default RS256.
+    oidc_algorithms: List[str] = Field(default_factory=lambda: ["RS256"], alias="OIDC_ALGORITHMS")
 
     # URLs / misc placeholders
     site_url: str | None = Field(default=None, alias="SITE_URL")
@@ -114,6 +118,12 @@ class Settings(BaseSettings):
     @classmethod
     def _validate_allowed_methods(cls, v: Any) -> list[str]:
         return cls._parse_list_env(v)
+
+    @field_validator("oidc_algorithms", mode="before")
+    @classmethod
+    def _validate_oidc_algorithms(cls, v: Any) -> list[str]:
+        parsed = cls._parse_list_env(v)
+        return parsed or ["RS256"]
 
 
 @lru_cache(maxsize=1)

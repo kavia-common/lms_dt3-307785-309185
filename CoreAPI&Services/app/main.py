@@ -7,6 +7,7 @@ This module wires together:
 - Global error handling with standardized JSON responses
 - Core routers (health/readiness)
 - CORS middleware configuration
+- JWT Bearer auth OpenAPI wiring (Swagger "Authorize" button)
 
 Run (example):
     uvicorn app.main:app --host 0.0.0.0 --port 3001 --reload
@@ -31,6 +32,10 @@ openapi_tags = [
     {
         "name": "Health",
         "description": "Service health and readiness probes for orchestration platforms.",
+    },
+    {
+        "name": "Auth",
+        "description": "Authentication helpers and debug endpoints.",
     },
     {
         "name": "Users",
@@ -61,6 +66,30 @@ def create_app() -> FastAPI:
         version="0.1.0",
         openapi_tags=openapi_tags,
     )
+
+    # Inject HTTP Bearer auth scheme into OpenAPI so Swagger UI supports "Authorize".
+    def _custom_openapi():  # type: ignore[no-untyped-def]
+        if app.openapi_schema:
+            return app.openapi_schema
+        schema = app.openapi()
+
+        components = schema.setdefault("components", {})
+        security_schemes = components.setdefault("securitySchemes", {})
+        security_schemes["BearerAuth"] = {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+            "description": (
+                "Paste an access token here. "
+                "When AUTH_STUB=false, API requires OIDC JWT validation against JWKS."
+            ),
+        }
+
+        # Do not set global security automatically because health endpoints are public.
+        app.openapi_schema = schema
+        return app.openapi_schema
+
+    app.openapi = _custom_openapi  # type: ignore[assignment]
 
     # CORS configuration (placeholder; env-driven). Keep permissive defaults OFF.
     app.add_middleware(
