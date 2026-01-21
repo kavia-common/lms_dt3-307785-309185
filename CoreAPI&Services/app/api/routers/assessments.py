@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, Query, status
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.db import get_db
 from app.schemas.assessments import (
@@ -14,9 +15,13 @@ from app.services.assessments import AssessmentsService
 router = APIRouter(prefix="/assessments", tags=["Assessments"])
 
 
-def get_assessments_service(request: Request) -> AssessmentsService:
-    """Dependency provider for AssessmentsService (MongoDB-backed)."""
-    db = get_db(request.app)
+def get_assessments_service(db: AsyncIOMotorDatabase = Depends(get_db)) -> AssessmentsService:
+    """Dependency provider for AssessmentsService (MongoDB-backed).
+
+    This is intentionally declared as a FastAPI dependency callable so tests can
+    override it via `app.dependency_overrides[get_assessments_service] = ...` without
+    triggering MongoDB initialization.
+    """
     return AssessmentsService(db=db)
 
 

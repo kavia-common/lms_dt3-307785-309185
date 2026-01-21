@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, Query, status
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.db import get_db
 from app.schemas.users import UserCreate, UserListResponse, UserRead, UserUpdate
@@ -9,9 +10,13 @@ from app.services.users import UsersService
 router = APIRouter(prefix="/users", tags=["Users"])
 
 
-def get_users_service(request: Request) -> UsersService:
-    """Dependency provider for UsersService (MongoDB-backed)."""
-    db = get_db(request.app)
+def get_users_service(db: AsyncIOMotorDatabase = Depends(get_db)) -> UsersService:
+    """Dependency provider for UsersService (MongoDB-backed).
+
+    This is intentionally declared as a FastAPI dependency callable so tests can
+    override it via `app.dependency_overrides[get_users_service] = ...` without
+    triggering MongoDB initialization.
+    """
     return UsersService(db=db)
 
 

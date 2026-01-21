@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, Query, status
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.db import get_db
 from app.schemas.content import ContentCreate, ContentListResponse, ContentRead, ContentUpdate
@@ -9,9 +10,13 @@ from app.services.content import ContentService
 router = APIRouter(prefix="/content", tags=["Content"])
 
 
-def get_content_service(request: Request) -> ContentService:
-    """Dependency provider for ContentService (MongoDB-backed)."""
-    db = get_db(request.app)
+def get_content_service(db: AsyncIOMotorDatabase = Depends(get_db)) -> ContentService:
+    """Dependency provider for ContentService (MongoDB-backed).
+
+    This is intentionally declared as a FastAPI dependency callable so tests can
+    override it via `app.dependency_overrides[get_content_service] = ...` without
+    triggering MongoDB initialization.
+    """
     return ContentService(db=db)
 
 

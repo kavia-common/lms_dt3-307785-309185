@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 import json
-from typing import Any, List
+from typing import Any, List, Optional
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -46,6 +46,15 @@ class Settings(BaseSettings):
     mongodb_uri: str | None = Field(default=None, alias="MONGODB_URI")
     mongodb_dbname: str = Field(default="lms", alias="MONGODB_DBNAME")
     mongodb_tls: bool = Field(default=False, alias="MONGODB_TLS")
+
+    # Auth / OIDC scaffolding
+    # NOTE: Default True to keep dev/tests working until real OIDC validation is implemented.
+    auth_stub: bool = Field(default=True, alias="AUTH_STUB")
+
+    oidc_issuer: Optional[str] = Field(default=None, alias="OIDC_ISSUER")
+    oidc_client_id: Optional[str] = Field(default=None, alias="OIDC_CLIENT_ID")
+    oidc_audience: Optional[str] = Field(default=None, alias="OIDC_AUDIENCE")
+    oidc_jwks_uri: Optional[str] = Field(default=None, alias="OIDC_JWKS_URI")
 
     # URLs / misc placeholders
     site_url: str | None = Field(default=None, alias="SITE_URL")
