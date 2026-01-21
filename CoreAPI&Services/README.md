@@ -85,6 +85,30 @@ Run:
 docker run --rm -p 3001:3001 --env-file .env lms-coreapi
 ```
 
+## Domain API skeletons (new)
+These endpoints are **placeholders** to establish the LMS domain structure (no DB logic yet):
+
+### Users
+- `GET /users` (list)
+- `GET /users/{user_id}` (get)
+- `POST /users` (create)
+- `PUT /users/{user_id}` (update)
+- `DELETE /users/{user_id}` (delete)
+
+### Content
+- `GET /content` (list)
+- `GET /content/{content_id}` (get)
+- `POST /content` (create)
+- `PUT /content/{content_id}` (update)
+- `DELETE /content/{content_id}` (delete)
+
+### Assessments
+- `GET /assessments` (list)
+- `GET /assessments/{assessment_id}` (get)
+- `POST /assessments` (create)
+- `PUT /assessments/{assessment_id}` (update)
+- `DELETE /assessments/{assessment_id}` (delete)
+
 ## Roadmap / TODO
 - TODO(auth): Microsoft Entra ID token validation
 - TODO(rbac): role-based authorization policies

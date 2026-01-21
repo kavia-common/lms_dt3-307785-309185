@@ -17,7 +17,10 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.routers.assessments import router as assessments_router
+from app.api.routers.content import router as content_router
 from app.api.routers.health import router as health_router
+from app.api.routers.users import router as users_router
 from app.core.config import get_settings
 from app.core.db import register_mongo_lifecycle
 from app.core.errors import install_exception_handlers
@@ -27,6 +30,18 @@ openapi_tags = [
     {
         "name": "Health",
         "description": "Service health and readiness probes for orchestration platforms.",
+    },
+    {
+        "name": "Users",
+        "description": "Users domain endpoints (placeholder CRUD).",
+    },
+    {
+        "name": "Content",
+        "description": "Content domain endpoints (placeholder CRUD).",
+    },
+    {
+        "name": "Assessments",
+        "description": "Assessments domain endpoints (placeholder CRUD).",
     },
 ]
 
@@ -63,6 +78,9 @@ def create_app() -> FastAPI:
 
     # Routers
     app.include_router(health_router)
+    app.include_router(users_router)
+    app.include_router(content_router)
+    app.include_router(assessments_router)
 
     return app
 
