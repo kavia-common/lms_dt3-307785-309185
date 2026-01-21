@@ -13,7 +13,7 @@ from typing import Any, Dict
 
 from fastapi import APIRouter, Depends
 
-from app.api.deps import CurrentUser, require_roles
+from app.api.deps import Principal, require_roles
 from app.api.security_policies import ADMIN_ROLES, READ_ROLES, WRITE_ROLES
 
 router = APIRouter()
@@ -25,7 +25,7 @@ router = APIRouter()
     summary="List assessments (RBAC: READ_ROLES)",
     description="Returns a minimal list of assessments. Requires any role in READ_ROLES.",
 )
-def list_assessments(_: CurrentUser = Depends(require_roles(READ_ROLES))) -> Dict[str, Any]:
+def list_assessments(_: Principal = Depends(require_roles(READ_ROLES))) -> Dict[str, Any]:
     """List assessments.
 
     Security:
@@ -45,7 +45,7 @@ def list_assessments(_: CurrentUser = Depends(require_roles(READ_ROLES))) -> Dic
 )
 def create_assessment(
     payload: Dict[str, Any],
-    _: CurrentUser = Depends(require_roles(WRITE_ROLES)),
+    _: Principal = Depends(require_roles(WRITE_ROLES)),
 ) -> Dict[str, Any]:
     """Create an assessment (stub).
 
@@ -68,7 +68,7 @@ def create_assessment(
     description="Deletes an assessment (stub). Requires any role in ADMIN_ROLES.",
 )
 def delete_assessment(
-    assessment_id: str, _: CurrentUser = Depends(require_roles(ADMIN_ROLES))
+    assessment_id: str, _: Principal = Depends(require_roles(ADMIN_ROLES))
 ) -> Dict[str, Any]:
     """Delete an assessment (stub).
 

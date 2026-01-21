@@ -13,7 +13,7 @@ from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends
 
-from app.api.deps import CurrentUser, require_roles
+from app.api.deps import Principal, require_roles
 from app.api.security_policies import ADMIN_ROLES, READ_ROLES, WRITE_ROLES
 
 router = APIRouter()
@@ -25,7 +25,7 @@ router = APIRouter()
     summary="List users (RBAC: READ_ROLES)",
     description="Returns a minimal list of users. Requires any role in READ_ROLES.",
 )
-def list_users(_: CurrentUser = Depends(require_roles(READ_ROLES))) -> Dict[str, Any]:
+def list_users(_: Principal = Depends(require_roles(READ_ROLES))) -> Dict[str, Any]:
     """List users.
 
     Security:
@@ -45,7 +45,7 @@ def list_users(_: CurrentUser = Depends(require_roles(READ_ROLES))) -> Dict[str,
 )
 def create_user(
     payload: Dict[str, Any],
-    _: CurrentUser = Depends(require_roles(WRITE_ROLES)),
+    _: Principal = Depends(require_roles(WRITE_ROLES)),
 ) -> Dict[str, Any]:
     """Create a user (stub).
 
@@ -67,7 +67,7 @@ def create_user(
     summary="Delete user (RBAC: ADMIN_ROLES)",
     description="Deletes a user (stub). Requires any role in ADMIN_ROLES.",
 )
-def delete_user(user_id: str, _: CurrentUser = Depends(require_roles(ADMIN_ROLES))) -> Dict[str, Any]:
+def delete_user(user_id: str, _: Principal = Depends(require_roles(ADMIN_ROLES))) -> Dict[str, Any]:
     """Delete a user (stub).
 
     Security:
