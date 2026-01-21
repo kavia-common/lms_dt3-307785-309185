@@ -34,8 +34,10 @@ class Settings(BaseSettings):
     )
     cors_max_age: int = Field(default=3600, alias="CORS_MAX_AGE")
 
-    # Future DB
+    # Database (MongoDB)
     mongodb_uri: str | None = Field(default=None, alias="MONGODB_URI")
+    mongodb_dbname: str = Field(default="lms", alias="MONGODB_DBNAME")
+    mongodb_tls: bool = Field(default=False, alias="MONGODB_TLS")
 
     # URLs / misc placeholders
     site_url: str | None = Field(default=None, alias="SITE_URL")

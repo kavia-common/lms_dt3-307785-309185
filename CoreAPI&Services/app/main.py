@@ -19,6 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routers.health import router as health_router
 from app.core.config import get_settings
+from app.core.db import register_mongo_lifecycle
 from app.core.errors import install_exception_handlers
 from app.core.logging import configure_logging
 
@@ -56,6 +57,9 @@ def create_app() -> FastAPI:
     )
 
     install_exception_handlers(app)
+
+    # DB lifecycle hooks
+    register_mongo_lifecycle(app, settings)
 
     # Routers
     app.include_router(health_router)
