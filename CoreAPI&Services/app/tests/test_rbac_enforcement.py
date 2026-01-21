@@ -11,12 +11,32 @@ from app.main import create_app
 
 def test_users_list_requires_auth(monkeypatch) -> None:
     monkeypatch.setenv("AUTH_STUB", "false")
+    # minimal config (won't be used because request is missing bearer)
+    monkeypatch.setenv("OIDC_ISSUER", "https://issuer.example")
+    monkeypatch.setenv("OIDC_JWKS_URI", "https://issuer.example/jwks")
     clear_settings_cache()
-    app = create_app()
-    client = TestClient(app)
 
+    app = create_app()
+
+    # Avoid Mongo access: override the DB dependency and the service provider.
+    from app.core.db import get_db
+    from app.tests.test_helpers import override_db
+
+    class _FakeDB:
+        pass
+
+    app.dependency_overrides[get_db] = override_db(_FakeDB())
+
+    class _FakeUsersService:
+        async def list_users(self, *, skip: int = 0, limit: int = 50):
+            return {"items": [], "total": 0, "skip": skip, "limit": limit}
+
+    app.dependency_overrides[get_users_service] = lambda: _FakeUsersService()
+
+    client = TestClient(app)
     resp = client.get("/users")
     assert resp.status_code == 401
+    assert "bearer" in (resp.headers.get("www-authenticate") or "").lower()
 
 
 def test_users_list_forbidden_without_read_role(monkeypatch) -> None:

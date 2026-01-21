@@ -5,10 +5,14 @@ from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 
 from app.api.routers.users import get_users_service
+from app.core.config import clear_settings_cache
 from app.main import create_app
 
 
-def test_users_list_ok_with_pagination() -> None:
+def test_users_list_ok_with_pagination(monkeypatch) -> None:
+    monkeypatch.setenv("AUTH_STUB", "true")
+    clear_settings_cache()
+
     app = create_app()
     now = datetime.now(tz=timezone.utc)
 
@@ -33,7 +37,10 @@ def test_users_list_ok_with_pagination() -> None:
     app.dependency_overrides[get_users_service] = lambda: _FakeUsersService()
 
     client = TestClient(app)
-    resp = client.get("/users?skip=5&limit=10")
+    resp = client.get(
+        "/users?skip=5&limit=10",
+        headers={"X-Auth-Subject": "u1", "X-Auth-Roles": "Learner"},
+    )
     assert resp.status_code == 200
 
     payload = resp.json()
@@ -44,7 +51,10 @@ def test_users_list_ok_with_pagination() -> None:
     assert payload["items"][0]["email"] == "alice@example.com"
 
 
-def test_users_create_returns_201() -> None:
+def test_users_create_returns_201(monkeypatch) -> None:
+    monkeypatch.setenv("AUTH_STUB", "true")
+    clear_settings_cache()
+
     app = create_app()
     now = datetime.now(tz=timezone.utc)
 
@@ -62,7 +72,11 @@ def test_users_create_returns_201() -> None:
     app.dependency_overrides[get_users_service] = lambda: _FakeUsersService()
 
     client = TestClient(app)
-    resp = client.post("/users", json={"name": "Bob", "email": "bob@example.com"})
+    resp = client.post(
+        "/users",
+        json={"name": "Bob", "email": "bob@example.com"},
+        headers={"X-Auth-Subject": "u1", "X-Auth-Roles": "Instructor"},
+    )
     assert resp.status_code == 201
     payload = resp.json()
     assert payload["name"] == "Bob"
@@ -70,8 +84,11 @@ def test_users_create_returns_201() -> None:
     assert "id" in payload
 
 
-def test_users_get_not_found() -> None:
+def test_users_get_not_found(monkeypatch) -> None:
     from fastapi import HTTPException, status
+
+    monkeypatch.setenv("AUTH_STUB", "true")
+    clear_settings_cache()
 
     app = create_app()
 
@@ -82,5 +99,8 @@ def test_users_get_not_found() -> None:
     app.dependency_overrides[get_users_service] = lambda: _FakeUsersService()
 
     client = TestClient(app)
-    resp = client.get("/users/507f1f77bcf86cd799439011")
+    resp = client.get(
+        "/users/507f1f77bcf86cd799439011",
+        headers={"X-Auth-Subject": "u1", "X-Auth-Roles": "Learner"},
+    )
     assert resp.status_code == 404

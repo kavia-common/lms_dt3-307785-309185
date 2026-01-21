@@ -5,10 +5,14 @@ from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 
 from app.api.routers.content import get_content_service
+from app.core.config import clear_settings_cache
 from app.main import create_app
 
 
-def test_content_list_ok_with_pagination() -> None:
+def test_content_list_ok_with_pagination(monkeypatch) -> None:
+    monkeypatch.setenv("AUTH_STUB", "true")
+    clear_settings_cache()
+
     app = create_app()
     now = datetime.now(tz=timezone.utc)
 
@@ -33,14 +37,20 @@ def test_content_list_ok_with_pagination() -> None:
     app.dependency_overrides[get_content_service] = lambda: _FakeContentService()
 
     client = TestClient(app)
-    resp = client.get("/content?skip=0&limit=1")
+    resp = client.get(
+        "/content?skip=0&limit=1",
+        headers={"X-Auth-Subject": "u1", "X-Auth-Roles": "Learner"},
+    )
     assert resp.status_code == 200
     payload = resp.json()
     assert payload["total"] == 1
     assert payload["items"][0]["slug"] == "intro"
 
 
-def test_content_create_returns_201() -> None:
+def test_content_create_returns_201(monkeypatch) -> None:
+    monkeypatch.setenv("AUTH_STUB", "true")
+    clear_settings_cache()
+
     app = create_app()
     now = datetime.now(tz=timezone.utc)
 
@@ -58,14 +68,21 @@ def test_content_create_returns_201() -> None:
     app.dependency_overrides[get_content_service] = lambda: _FakeContentService()
 
     client = TestClient(app)
-    resp = client.post("/content", json={"title": "Intro", "slug": "intro"})
+    resp = client.post(
+        "/content",
+        json={"title": "Intro", "slug": "intro"},
+        headers={"X-Auth-Subject": "u1", "X-Auth-Roles": "Instructor"},
+    )
     assert resp.status_code == 201
     payload = resp.json()
     assert payload["slug"] == "intro"
 
 
-def test_content_get_not_found() -> None:
+def test_content_get_not_found(monkeypatch) -> None:
     from fastapi import HTTPException, status
+
+    monkeypatch.setenv("AUTH_STUB", "true")
+    clear_settings_cache()
 
     app = create_app()
 
@@ -76,5 +93,8 @@ def test_content_get_not_found() -> None:
     app.dependency_overrides[get_content_service] = lambda: _FakeContentService()
 
     client = TestClient(app)
-    resp = client.get("/content/507f1f77bcf86cd799439012")
+    resp = client.get(
+        "/content/507f1f77bcf86cd799439012",
+        headers={"X-Auth-Subject": "u1", "X-Auth-Roles": "Learner"},
+    )
     assert resp.status_code == 404

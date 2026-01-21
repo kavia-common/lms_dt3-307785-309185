@@ -37,7 +37,11 @@ def install_exception_handlers(app: FastAPI) -> None:
             details={"status_code": exc.status_code},
             request_id=_request_id_from_headers(request),
         )
-        return JSONResponse(status_code=exc.status_code, content=payload.model_dump())
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=payload.model_dump(),
+            headers=getattr(exc, "headers", None),
+        )
 
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
