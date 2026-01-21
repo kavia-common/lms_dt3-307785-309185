@@ -62,13 +62,34 @@ Open:
 - `http://localhost:3001/docs`
 - `http://localhost:3001/openapi.json`
 
-### 3) Lint/format
+### 3) Seed sample data (MongoDB)
+These scripts create/remove **minimal sample data** for quick sanity checks of:
+- `Users` (`/users`)
+- `Content` (`/content`)
+- `Assessments` (`/assessments`)
+
+Required env vars:
+- `MONGODB_URI`
+- `MONGODB_DBNAME` (default: `lms`)
+- `MONGODB_TLS` (default: `false`)
+
+Run seeds (idempotent):
+```bash
+python -m app.scripts.seed
+```
+
+Clear seeded data (safe; does not drop indexes/collections):
+```bash
+python -m app.scripts.clear_db
+```
+
+### 4) Lint/format
 ```bash
 ruff check .
 black .
 ```
 
-### 4) Run tests
+### 5) Run tests
 ```bash
 pytest -q
 ```
